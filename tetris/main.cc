@@ -10,11 +10,12 @@ using namespace std;
 
 class Tetris {
  public:
-  enum Cell { kI, kJ, kL, kO, kS, kT, kZ, kE };
+  enum Cell { kE, kI, kJ, kL, kO, kS, kT, kZ };
 
   enum Move { kLeft, kRight, kClock, kCounter, kDrop, kNone };
 
-  static constexpr bitset<16> kTetrominos[7] = {
+  static constexpr bitset<16> kTetrominos[8] = {
+    0b0000000000000000,
     0b0010001000100010,
     0b0010011001000000,
     0b0100011000100000,
@@ -46,6 +47,7 @@ class Tetris {
   }
 
   Tetris(const int& rows, const int& cols) : rows{rows}, cols{cols} {
+    srand((unsigned int)time(NULL));
     field_ = new char[rows * cols];
     memset(field_, Cell::kE, rows * cols);
     NewTetromino();
@@ -108,7 +110,7 @@ class Tetris {
   void NewTetromino() {
     curr = next;
     next = Tetromino();
-    next.type = rand() % 7;
+    next.type = rand() % 7 + 1;
     next.row = 0;
     next.col = cols / 2 - 2;
     next.rotate = 0;
@@ -335,7 +337,7 @@ int main(int argc, char* argv[]) {
 
   while (window.Tick(key)) {
     doupdate();
-    usleep(100);
+    usleep(1000);
     switch (getch()) {
     case KEY_LEFT:
       key = Tetris::Move::kLeft;
