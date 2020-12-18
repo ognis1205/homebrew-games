@@ -49,7 +49,7 @@ class Context {
     return 0;
   }
 
-  Context(const int& rows, const int& cols) : rows{rows}, cols{cols} {
+  Context(const int& rows, const int& cols) : rows{rows}, cols{cols}, score{0}, key{Key::kNone} {
     srand(static_cast<unsigned int>(time(NULL)));
     field_ = new char[rows * cols];
     memset(field_, Cell::kE, rows * cols);
@@ -63,7 +63,7 @@ class Context {
     return field_[cols * row + col];
   }
 
-  bool Update(const Key& key) {
+  bool Update() {
     ticks_till_drop_--;
     if (ticks_till_drop_ <= 0) {
       Remove();
@@ -77,14 +77,15 @@ class Context {
         Next();
       }
     }
-    HandleKey(key);
+    HandleKey();
     ScoreUp(CheckLines());
     return !GameOver();
   }
 
-  int rows;
-  int cols;
+  const int rows;
+  const int cols;
   int score;
+  Key key;
   Tetromino curr, next;
 
  private:
@@ -200,7 +201,7 @@ class Context {
     return lines;
   }
 
-  void HandleKey(const Key& key) {
+  void HandleKey() {
     switch (key) {
     case kLeft:
       MoveTo(-1);
@@ -271,11 +272,15 @@ class Tetris {
     endwin();
   }
 
-  bool Tick(const Context::Key& key) {
+  bool Tick() {
     RefreshField();
     RefreshNext();
     RefreshScore();
-    return context_.Update(key);
+    return context_.Update();
+  }
+
+  void SendKey(const Context::Key& key) {
+    context_.key = key;
   }
 
  private:
@@ -333,26 +338,25 @@ class Tetris {
 
 int main(int argc, char* argv[]) {
   Tetris tetris(22, 10);
-  Context::Key key = Context::Key::kNone;
 
-  while (tetris.Tick(key)) {
+  while (tetris.Tick()) {
     doupdate();
     usleep(1000);
     switch (getch()) {
     case KEY_LEFT:
-      key = Context::Key::kLeft;
+      tetris.SendKey(Context::Key::kLeft);
       break;
     case KEY_RIGHT:
-      key = Context::Key::kRight;
+      tetris.SendKey(Context::Key::kRight);
       break;
     case KEY_UP:
-      key = Context::Key::kClock;
+      tetris.SendKey(Context::Key::kClock);
       break;
     case KEY_DOWN:
-      key = Context::Key::kDrop;
+      tetris.SendKey(Context::Key::kDrop);
       break;
     default:
-      key = Context::Key::kNone;
+      tetris.SendKey(Context::Key::kNone);
     }
   }
 
