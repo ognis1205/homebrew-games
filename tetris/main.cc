@@ -11,7 +11,7 @@
 
 using namespace std;
 
-class Tetris {
+class Context {
  public:
   enum Cell { kE, kI, kJ, kL, kO, kS, kT, kZ };
 
@@ -49,54 +49,36 @@ class Tetris {
     return 0;
   }
 
-  Tetris(const int& rows, const int& cols) : rows{rows}, cols{cols} {
-    srand((unsigned int)time(NULL));
+  Context(const int& rows, const int& cols) : rows{rows}, cols{cols} {
+    srand(static_cast<unsigned int>(time(NULL)));
     field_ = new char[rows * cols];
     memset(field_, Cell::kE, rows * cols);
-    New();
-    New();
+    Next();
+    Next();
   }
 
-  ~Tetris() { delete[] field_; }
+  ~Context() { delete[] field_; }
 
   char CellAt(const int& row, const int& col) const {
     return field_[cols * row + col];
   }
 
-  bool Tick(const Key& key) {
+  bool Update(const Key& key) {
     ticks_till_drop_--;
     if (ticks_till_drop_ <= 0) {
       Remove();
       curr.row++;
-      if (Fit()) {
+      if (IsConsistent()) {
         ticks_till_drop_ = kTicksTillDrop;
         Put();
       } else {
         curr.row--;
         Put();
-        New();
+        Next();
       }
     }
-    switch (key) {
-    case kLeft:
-      MoveTo(-1);
-      break;
-    case kRight:
-      MoveTo(1);
-      break;
-    case kDrop:
-      Drop();
-      break;
-    case kClock:
-      RotateTo(1);
-      break;
-    case kCounter:
-      RotateTo(-1);
-      break;
-    default:
-      break;
-    }
-    Score(CheckLines());
+    HandleKey(key);
+    ScoreUp(CheckLines());
     return !GameOver();
   }
 
@@ -110,7 +92,7 @@ class Tetris {
 
   static constexpr int kLineMultiplier[] = {0, 40, 100, 300, 1200};
 
-  void New() {
+  void Next() {
     curr = next;
     next = Tetromino();
     next.type = rand() % 7 + 1;
@@ -119,18 +101,14 @@ class Tetris {
     next.rotate = 0;
   }
   
-  void Fill(const int& row, const int& col, const char& cell) {
-    field_[cols * row + col] = cell;
-  }
-
   bool IsValid(const int& row, const int& col) const {
     return 0 <= row && row < rows && 0 <= col && col < cols;
   }
 
-  bool Fit() const {
+  bool IsConsistent() const {
     for (int x = 0; x < 4; x++) {
       for (int y = 0; y < 4; y++) {
-        if (Tetris::kTetrominos[curr.type][Rotate4x4(x, y, curr.rotate)]
+        if (Context::kTetrominos[curr.type][Rotate4x4(x, y, curr.rotate)]
             && (!IsValid(curr.row + x, curr.col + y) || CellAt(curr.row + x, curr.col + y) != Cell::kE))
           return false;
       }
@@ -138,10 +116,14 @@ class Tetris {
     return true;
   }
 
+  void Fill(const int& row, const int& col, const char& cell) {
+    field_[cols * row + col] = cell;
+  }
+
   void Put() {
     for (int x = 0; x < 4; x++) {
       for (int y = 0; y < 4; y++) {
-        if (Tetris::kTetrominos[curr.type][Rotate4x4(x, y, curr.rotate)])
+        if (Context::kTetrominos[curr.type][Rotate4x4(x, y, curr.rotate)])
           Fill(curr.row + x, curr.col + y, Cell(curr.type));
       }
     }
@@ -150,7 +132,7 @@ class Tetris {
   void Remove() {
     for (int x = 0; x < 4; x++) {
       for (int y = 0; y < 4; y++) {
-        if (Tetris::kTetrominos[curr.type][Rotate4x4(x, y, curr.rotate)])
+        if (Context::kTetrominos[curr.type][Rotate4x4(x, y, curr.rotate)])
           Fill(curr.row + x, curr.col + y, Cell::kE);
       }
     }
@@ -159,17 +141,8 @@ class Tetris {
   void MoveTo(const int& dir) {
     Remove();
     curr.col += dir;
-    if (!Fit()) {
+    if (!IsConsistent()) {
       curr.col -= dir;
-    }
-    Put();
-  }
-
-  void Drop() {
-    Remove();
-    curr.row++;
-    if (!Fit()) {
-      curr.row--;
     }
     Put();
   }
@@ -178,12 +151,21 @@ class Tetris {
     Remove();
     while (true) {
       curr.rotate = (curr.rotate + dir) % 4;
-      if (Fit()) break;
+      if (IsConsistent()) break;
       curr.col--;
-      if (Fit()) break;
+      if (IsConsistent()) break;
       curr.col += 2;
-      if (Fit()) break;
+      if (IsConsistent()) break;
       curr.col--;
+    }
+    Put();
+  }
+
+  void Drop() {
+    Remove();
+    curr.row++;
+    if (!IsConsistent()) {
+      curr.row--;
     }
     Put();
   }
@@ -218,8 +200,30 @@ class Tetris {
     return lines;
   }
 
-  void Score(const int& lines) {
-    score += Tetris::kLineMultiplier[lines];
+  void HandleKey(const Key& key) {
+    switch (key) {
+    case kLeft:
+      MoveTo(-1);
+      break;
+    case kRight:
+      MoveTo(1);
+      break;
+    case kDrop:
+      Drop();
+      break;
+    case kClock:
+      RotateTo(1);
+      break;
+    case kCounter:
+      RotateTo(-1);
+      break;
+    default:
+      break;
+    }
+  }
+
+  void ScoreUp(const int& lines) {
+    score += Context::kLineMultiplier[lines];
   }
 
   bool GameOver() {
@@ -239,9 +243,9 @@ class Tetris {
   int ticks_till_drop_;
 };
 
-class Console {
+class Tetris {
  public:
-  Console(const int& rows, const int& cols) : tetris_{rows, cols} {
+  Tetris(const int& rows, const int& cols) : context_{rows, cols} {
     initscr();
     cbreak();
     noecho();
@@ -249,40 +253,40 @@ class Console {
     timeout(0);
     curs_set(0); 
     start_color();
-    init_pair(Tetris::Cell::kI, COLOR_CYAN, COLOR_BLACK);
-    init_pair(Tetris::Cell::kJ, COLOR_BLUE, COLOR_BLACK);
-    init_pair(Tetris::Cell::kL, COLOR_WHITE, COLOR_BLACK);
-    init_pair(Tetris::Cell::kO, COLOR_YELLOW, COLOR_BLACK);
-    init_pair(Tetris::Cell::kS, COLOR_GREEN, COLOR_BLACK);
-    init_pair(Tetris::Cell::kT, COLOR_MAGENTA, COLOR_BLACK);
-    init_pair(Tetris::Cell::kZ, COLOR_RED, COLOR_BLACK);
-    init_pair(Tetris::Cell::kE, COLOR_BLACK, COLOR_BLACK);
-    field_ = newwin(tetris_.rows + 2, 2 * tetris_.cols + 2, 0, 0);
-    next_ = newwin(6, 10, 0, 2 * (tetris_.cols + 1) + 1);
-    score_ = newwin(6, 10, 14, 2 * (tetris_.cols + 1 ) + 1);
+    init_pair(Context::Cell::kI, COLOR_CYAN, COLOR_BLACK);
+    init_pair(Context::Cell::kJ, COLOR_BLUE, COLOR_BLACK);
+    init_pair(Context::Cell::kL, COLOR_WHITE, COLOR_BLACK);
+    init_pair(Context::Cell::kO, COLOR_YELLOW, COLOR_BLACK);
+    init_pair(Context::Cell::kS, COLOR_GREEN, COLOR_BLACK);
+    init_pair(Context::Cell::kT, COLOR_MAGENTA, COLOR_BLACK);
+    init_pair(Context::Cell::kZ, COLOR_RED, COLOR_BLACK);
+    init_pair(Context::Cell::kE, COLOR_BLACK, COLOR_BLACK);
+    field_ = newwin(context_.rows + 2, 2 * context_.cols + 2, 0, 0);
+    next_ = newwin(6, 10, 0, 2 * (context_.cols + 1) + 1);
+    score_ = newwin(6, 10, 14, 2 * (context_.cols + 1 ) + 1);
   }
 
-  ~Console() {
+  ~Tetris() {
     wclear(stdscr);
     endwin();
   }
 
-  bool Tick(const Tetris::Key& key) {
+  bool Tick(const Context::Key& key) {
     RefreshField();
     RefreshNext();
     RefreshScore();
-    return tetris_.Tick(key);
+    return context_.Update(key);
   }
 
  private:
   void RefreshField() {
     werase(field_);
     box(field_, 0, 0);
-    for (int row = 0; row < tetris_.rows; row++) {
+    for (int row = 0; row < context_.rows; row++) {
       wmove(field_, row + 1, 1);
-      for (int col = 0; col < tetris_.cols; col++) {
-        if (tetris_.CellAt(row, col) != Tetris::Cell::kE) {
-          Draw(field_, tetris_.CellAt(row, col));
+      for (int col = 0; col < context_.cols; col++) {
+        if (context_.CellAt(row, col) != Context::Cell::kE) {
+          Draw(field_, context_.CellAt(row, col));
         } else {
           Draw(field_);
         }
@@ -294,16 +298,11 @@ class Console {
   void RefreshNext() {
     werase(next_);
     box(next_, 0, 0);
-    if (tetris_.next.type == -1) {
-      wnoutrefresh(next_);
-      return;
-    }
-
     for (int x = 0; x < 4; x++) {
       for (int y = 0; y < 4; y++) {
-        if (Tetris::kTetrominos[tetris_.next.type][Tetris::Rotate4x4(x, y, tetris_.next.rotate)]) {
+        if (Context::kTetrominos[context_.next.type][Context::Rotate4x4(x, y, context_.next.rotate)]) {
           wmove(next_, x + 1, y * 2 + 1);
-          Draw(next_, Tetris::Cell(tetris_.next.type));
+          Draw(next_, Context::Cell(context_.next.type));
         }
       }
     }
@@ -312,7 +311,7 @@ class Console {
 
   void RefreshScore() {
     werase(score_);
-    wprintw(score_, "Score\n%d\n", tetris_.score);
+    wprintw(score_, "Score\n%d\n", context_.score);
     wnoutrefresh(score_);
   }
 
@@ -326,34 +325,34 @@ class Console {
     waddch(window, ' ' | A_REVERSE | COLOR_PAIR(cell));
   }
 
-  Tetris tetris_;
+  Context context_;
   WINDOW* field_;
   WINDOW* next_;
   WINDOW* score_;
 };
 
 int main(int argc, char* argv[]) {
-  Console console(22, 10);
-  Tetris::Key key = Tetris::Key::kNone;
+  Tetris tetris(22, 10);
+  Context::Key key = Context::Key::kNone;
 
-  while (console.Tick(key)) {
+  while (tetris.Tick(key)) {
     doupdate();
     usleep(1000);
     switch (getch()) {
     case KEY_LEFT:
-      key = Tetris::Key::kLeft;
+      key = Context::Key::kLeft;
       break;
     case KEY_RIGHT:
-      key = Tetris::Key::kRight;
+      key = Context::Key::kRight;
       break;
     case KEY_UP:
-      key = Tetris::Key::kClock;
+      key = Context::Key::kClock;
       break;
     case KEY_DOWN:
-      key = Tetris::Key::kDrop;
+      key = Context::Key::kDrop;
       break;
     default:
-      key = Tetris::Key::kNone;
+      key = Context::Key::kNone;
     }
   }
 
