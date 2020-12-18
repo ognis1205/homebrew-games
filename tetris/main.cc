@@ -258,6 +258,11 @@ class Window {
     score_ = newwin(6, 10, 14, 2 * (tetris_.cols + 1 ) + 1);
   }
 
+  ~Window() {
+    wclear(stdscr);
+    endwin();
+  }
+
   bool Tick(const Tetris::Move& move) {
     DisplayField();
     DisplayNext();
@@ -267,6 +272,7 @@ class Window {
 
  private:
   void DisplayField() {
+    werase(field_);
     box(field_, 0, 0);
     for (int row = 0; row < tetris_.rows; row++) {
       wmove(field_, row + 1, 1);
@@ -282,7 +288,7 @@ class Window {
   }
 
   void DisplayNext() {
-    wclear(next_);
+    werase(next_);
     box(next_, 0, 0);
     if (tetris_.next.type == -1) {
       wnoutrefresh(next_);
@@ -301,11 +307,10 @@ class Window {
   }
 
   void DisplayScore() {
-  wclear(score_);
-  box(score_, 0, 0);
-  wprintw(score_, "Score\n%d\n", tetris_.score);
-  wnoutrefresh(score_);
-}
+    werase(score_);
+    wprintw(score_, "Score\n%d\n", tetris_.score);
+    wnoutrefresh(score_);
+  }
 
   void PutBlock(WINDOW* window) {
     waddch((window), ' ');
