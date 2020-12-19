@@ -64,8 +64,7 @@ class Context {
   }
 
   bool Update() {
-    ticks_till_drop_--;
-    if (ticks_till_drop_ <= 0) {
+    if (ticks_till_drop_-- <= 0) {
       Remove();
       curr.row++;
       if (IsConsistent()) {
@@ -102,7 +101,7 @@ class Context {
     next.rotate = 0;
   }
   
-  bool IsValid(const int& row, const int& col) const {
+  bool IsValidCell(const int& row, const int& col) const {
     return 0 <= row && row < rows && 0 <= col && col < cols;
   }
 
@@ -110,7 +109,7 @@ class Context {
     for (int x = 0; x < 4; x++) {
       for (int y = 0; y < 4; y++) {
         if (Context::kTetrominos[curr.type][Rotate4x4(x, y, curr.rotate)]
-            && (!IsValid(curr.row + x, curr.col + y) || CellAt(curr.row + x, curr.col + y) != Cell::kE))
+            && (!IsValidCell(curr.row + x, curr.col + y) || CellAt(curr.row + x, curr.col + y) != Cell::kE))
           return false;
       }
     }
