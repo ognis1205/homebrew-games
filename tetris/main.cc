@@ -370,21 +370,25 @@ class Tetris {
 
 int main(int argc, char* argv[]) {
   Config config;
-
   opterr = 0;
   int option;
   while ((option = getopt(argc, argv, "r:c:d:")) != -1 ) {
     switch (option) {
     case 'r':
-      config.rows = stoi(optarg);
+      config.rows = atoi(optarg);
       break;
     case 'c':
-      config.cols = stoi(optarg);
+      config.cols = atoi(optarg);
       break;
     case 'd':
-      config.display_ratio = stoi(optarg);
+      config.display_ratio = atoi(optarg);
       break;
-    default:
+    case '?':
+    case 'h':
+    default :
+      cout << "show usage." << endl;
+      break;
+    case -1:
       break;
     }
   }
