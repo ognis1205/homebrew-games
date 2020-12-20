@@ -5,6 +5,7 @@
  * Trademarks are owned by their respect owners.
  */
 #include <bitset>
+#include <cassert>
 #include <cstring>
 #include <iostream>
 #include <ncurses.h>
@@ -43,19 +44,9 @@ constexpr bitset<16> kTetrominos[8] = {
   0b0000011001000100
 };
 
-int RotateIndex4x4(const int& x, const int& y, const int& r) {
-  switch (r % 4) {
-  case 0:
-    return (y * 4) + x;
-  case 1:
-    return 12 + y - (x * 4);
-  case 2:
-    return 15 - (y * 4) - x;
-  case 3:
-    return 3 - y + (x * 4);
-  }
-  return 0;
-}
+const int kTicksTillDrop = 500;
+
+constexpr int kLineMultiplier[] = {0, 40, 100, 300, 1200};
 
 struct Tetromino {
   int type;
@@ -70,13 +61,31 @@ struct Config {
   int display_ratio = 1;
 };
 
+int RotateIndex4x4(const int& x, const int& y, const int& r) {
+  switch (r % 4) {
+  case 0:
+    return (y * 4) + x;
+  case 1:
+    return 12 + y - (x * 4);
+  case 2:
+    return 15 - (y * 4) - x;
+  case 3:
+    return 3 - y + (x * 4);
+  }
+  return 0;
+}
+
+int TetrominoCellDefined(const int& t, const int& x, const int& y, const int& r) {
+  return kTetrominos[t][static_cast<size_t>(RotateIndex4x4(x, y, r))];
+}
+
 class Context {
  public:
   Context(const int& rows, const int& cols)
       : rows{rows}, cols{cols}, score{0}, key{Key::kNone} {
     srand(static_cast<unsigned int>(time(NULL)));
-    field_ = new char[rows * cols];
-    memset(field_, Cell::kEmpty, rows * cols);
+    field_ = new char[static_cast<size_t>(rows * cols)];
+    memset(field_, Cell::kEmpty, static_cast<size_t>(rows * cols));
     Next();
     Next();
   }
@@ -112,10 +121,6 @@ class Context {
   Tetromino curr, next;
 
  private:
-  static const int kTicksTillDrop = 500;
-
-  static constexpr int kLineMultiplier[] = {0, 40, 100, 300, 1200};
-
   void Next() {
     curr = next;
     next = Tetromino();
@@ -132,7 +137,7 @@ class Context {
   bool IsConsistent() const {
     for (int x = 0; x < 4; x++) {
       for (int y = 0; y < 4; y++) {
-        if (kTetrominos[curr.type][RotateIndex4x4(x, y, curr.rotate)] &&
+        if (TetrominoCellDefined(curr.type, x, y, curr.rotate) &&
             (!IsValidCell(curr.row + x, curr.col + y) ||
              CellAt(curr.row + x, curr.col + y) != Cell::kEmpty))
           return false;
@@ -148,7 +153,7 @@ class Context {
   void Put() {
     for (int x = 0; x < 4; x++) {
       for (int y = 0; y < 4; y++) {
-        if (kTetrominos[curr.type][RotateIndex4x4(x, y, curr.rotate)])
+        if (TetrominoCellDefined(curr.type, x, y, curr.rotate))
           Fill(curr.row + x, curr.col + y, Cell(curr.type));
       }
     }
@@ -157,7 +162,7 @@ class Context {
   void Remove() {
     for (int x = 0; x < 4; x++) {
       for (int y = 0; y < 4; y++) {
-        if (kTetrominos[curr.type][RotateIndex4x4(x, y, curr.rotate)])
+        if (TetrominoCellDefined(curr.type, x, y, curr.rotate))
           Fill(curr.row + x, curr.col + y, Cell::kEmpty);
       }
     }
@@ -246,7 +251,7 @@ class Context {
     }
   }
 
-  void ScoreUp(const int& lines) { score += Context::kLineMultiplier[lines]; }
+  void ScoreUp(const int& lines) { score += kLineMultiplier[lines]; }
 
   bool GameOver() {
     Remove();
@@ -287,15 +292,18 @@ class Tetris {
     field_ = newwin(
       config_.display_ratio * context_.rows + 2,
       2 * config_.display_ratio * context_.cols + 2,
-      0, 0);
+      0,
+      0);
     next_ = newwin(
       config_.display_ratio * 4 + 2,
       2 * config_.display_ratio * 4 + 2,
-      0, 2 * config_.display_ratio * context_.cols + 2 + config_.display_ratio);
+      0,
+      2 * config_.display_ratio * context_.cols + 2 + config_.display_ratio);
     score_ = newwin(
       config_.display_ratio * 12,
       config_.display_ratio * 20,
-      config_.display_ratio * 12 + 2, 2 * config_.display_ratio * context_.cols + 2 + config_.display_ratio);
+      config_.display_ratio * 12 + 2,
+      2 * config_.display_ratio * context_.cols + 2 + config_.display_ratio);
   }
 
   ~Tetris() {
@@ -319,7 +327,9 @@ class Tetris {
     for (int row = 0; row < config_.display_ratio * context_.rows; row++) {
       wmove(field_, row + 1, 1);
       for (int col = 0; col < config_.display_ratio * context_.cols; col++) {
-        if (context_.CellAt(row / config_.display_ratio, col / config_.display_ratio) != Cell::kEmpty) {
+        if (context_.CellAt(
+	      row / config_.display_ratio,
+	      col / config_.display_ratio) != Cell::kEmpty) {
           Draw(field_, context_.CellAt(row / config_.display_ratio, col / config_.display_ratio));
         } else {
           Draw(field_);
@@ -335,7 +345,11 @@ class Tetris {
     for (int x = 0; x < config_.display_ratio * 4; x++) {
       wmove(next_, x + 1, 1);
       for (int y = 0; y < config_.display_ratio * 4; y++) {
-        if (kTetrominos[context_.next.type][RotateIndex4x4(x / config_.display_ratio, y / config_.display_ratio, context_.next.rotate)]) {
+        if (TetrominoCellDefined(
+	      context_.next.type,
+	      x / config_.display_ratio,
+	      y / config_.display_ratio,
+	      context_.next.rotate)) {
           Draw(next_, Cell(context_.next.type));
         } else {
           Draw(next_);
@@ -357,8 +371,8 @@ class Tetris {
   }
 
   void Draw(WINDOW* window, const char& cell) {
-    waddch(window, ' ' | A_REVERSE | COLOR_PAIR(cell));
-    waddch(window, ' ' | A_REVERSE | COLOR_PAIR(cell));
+    waddch(window, ' ' | A_REVERSE | static_cast<unsigned>(COLOR_PAIR(cell)));
+    waddch(window, ' ' | A_REVERSE | static_cast<unsigned>(COLOR_PAIR(cell)));
   }
 
   Config config_;
@@ -372,26 +386,29 @@ int main(int argc, char* argv[]) {
   Config config;
   opterr = 0;
   int option;
-  while ((option = getopt(argc, argv, "r:c:d:")) != -1 ) {
+  while ((option = getopt(argc, argv, "r:c:d:h")) != -1 ) {
     switch (option) {
     case 'r':
-      config.rows = atoi(optarg);
+      config.rows =
+	static_cast<int>(strtol(optarg, nullptr, 0));
       break;
     case 'c':
-      config.cols = atoi(optarg);
+      config.cols =
+	static_cast<int>(strtol(optarg, nullptr, 0));
       break;
     case 'd':
-      config.display_ratio = atoi(optarg);
+      config.display_ratio =
+	static_cast<int>(strtol(optarg, nullptr, 0));
       break;
-    case '?':
     case 'h':
     default :
       cout << "show usage." << endl;
-      break;
-    case -1:
-      break;
+      return 0;
     }
   }
+  assert(config.rows > 21);
+  assert(config.cols > 9);
+  assert(config.display_ratio > 0);
 
   Tetris tetris(config);
   while (tetris.Tick()) {
